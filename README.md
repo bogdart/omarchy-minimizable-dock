@@ -99,24 +99,50 @@ from a plugin. If you want them, clone the repo and run:
 | `SUPER + CTRL + M` | restore the last minimized window |
 | `SUPER + D` | hide/show the dock |
 
-It touches exactly one file, `~/.config/hypr/bindings.lua`, appending a marked
-block. Nothing you already have is rewritten — your existing lines stay where
-they are, the file is backed up first, and `--uninstall` removes that block and
-nothing else.
+#### Exactly what it does
 
-One thing to know: because the block is appended, its bindings take precedence
-over an earlier binding of the same keys. If any of the three is already bound,
-the script warns you and names what it is shadowing rather than deciding for
-you; your original line is still in the file and works again once the block is
-removed.
+One file, `~/.config/hypr/bindings.lua`. Nothing else on the system is read or
+written, no other file is created, and it never needs root.
 
-Or skip the script and paste this into `~/.config/hypr/bindings.lua` yourself:
+1. Refuses to continue unless that path is a regular file — not a symlink — in
+   a directory that is also not a symlink and is owned by you. The path is
+   predictable, so a link left in its place is the obvious way to turn this
+   into a write somewhere else.
+2. Copies the current file to `bindings.lua.bak.<timestamp>.<random>`, created
+   exclusively with `mktemp` so the backup cannot be redirected either.
+3. Writes the original content plus the block below to a `mktemp` file **in the
+   same directory**, then renames it over the original. The rename is atomic:
+   a reader sees either the old file or the new one, never a partial write, and
+   nothing is ever appended to a path resolved at the last moment.
+4. Runs `hyprctl reload`.
+
+`--uninstall` reverses step 3, removing everything between the two markers and
+leaving the rest of the file untouched. `--dry-run` performs steps 1 and 4's
+checks and prints what it would do without writing anything.
+
+Because the block is appended, its bindings take precedence over an earlier
+binding of the same keys. If any of the three is already bound, the script
+warns and names what it is shadowing rather than deciding for you; your
+original line stays in the file and works again once the block is removed.
+
+#### Manual setup instead
+
+The script is a convenience, not a requirement. To do it by hand — or to review
+exactly what it would have written — paste this at the end of
+`~/.config/hypr/bindings.lua` and run `hyprctl reload`:
 
 ```lua
+-- >>> omarchy dock shortcuts >>>
 o.bind("SUPER + M", "Minimize window to dock", hl.dsp.window.move({ workspace = "special:minimized", follow = false }))
 o.bind("SUPER + CTRL + M", "Restore last minimized window", "omarchy-shell dock restore")
 o.bind("SUPER + D", "Toggle dock", "omarchy-shell dock toggle")
+-- <<< omarchy dock shortcuts <<<
 ```
+
+Deleting those lines is a complete uninstall of the shortcuts. The dock reads
+nothing from them — they are ordinary Hyprland bindings that call the dock's IPC
+by its `dock` target name, so they keep working across reinstalls and even under
+a different plugin id.
 
 ## Layout
 

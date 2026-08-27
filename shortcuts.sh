@@ -57,13 +57,61 @@ done
 
 hypr_live() { command -v hyprctl >/dev/null && hyprctl version >/dev/null 2>&1; }
 
+# bindings.lua sits at a path anyone can predict, so a symlink planted in its
+# place — or in its directory — is the obvious way to turn an append here into
+# a write somewhere else. Refuse to touch anything that is not a plain file in
+# a plain directory that we own, and never follow a link out of it.
+assert_safe_target() {
+  local path=$1 dir
+  dir=$(dirname -- "$path")
+  [[ -L $dir ]] && die "$dir is a symlink; refusing to write through it"
+  [[ -d $dir ]] || die "$dir is not a directory"
+  [[ -O $dir ]] || die "$dir is not owned by you; refusing to write there"
+  if [[ -L $path ]]; then
+    die "$path is a symlink; refusing to write through it"
+  elif [[ -e $path ]]; then
+    [[ -f $path ]] || die "$path is not a regular file"
+    [[ -O $path ]] || die "$path is not owned by you; refusing to write to it"
+  fi
+  return 0
+}
+
+# Content on stdin, replacing $1 in one step. The temporary file is created
+# exclusively by mktemp in the *same* directory, so the name cannot be guessed
+# and the final rename is atomic — a reader either sees the old file or the new
+# one, never a half-written one, and never a file we appended to blind.
+write_atomic() {
+  local path=$1 dir tmp mode
+  dir=$(dirname -- "$path")
+  tmp=$(mktemp "$dir/.dock-shortcuts.XXXXXX") || die "could not create a temporary file in $dir"
+  # shellcheck disable=SC2064
+  trap "rm -f -- '$tmp'" RETURN
+  chmod 600 -- "$tmp"
+  cat > "$tmp"
+  if mode=$(stat -c %a -- "$path" 2>/dev/null) && [[ -n $mode ]]; then
+    chmod "$mode" -- "$tmp"
+  else
+    chmod 644 -- "$tmp"
+  fi
+  # Re-check immediately before the rename: the window since assert_safe_target
+  # is small, but it costs nothing to close it as far as a shell can.
+  [[ -L $path ]] && die "$path became a symlink while writing; aborting"
+  mv -f -- "$tmp" "$path"
+  trap - RETURN
+  return 0
+}
+
 backup() {
   local path=$1
   [[ -e $path ]] || return 0
-  local copy="$path.bak.$(date +%Y%m%d%H%M%S)"
-  ((DRY_RUN)) && { info "would back up $(basename "$path")"; return 0; }
-  cp -a "$path" "$copy"
-  info "backed up $(basename "$path") -> $(basename "$copy")"
+  ((DRY_RUN)) && { info "would back up $(basename -- "$path")"; return 0; }
+  local copy
+  # mktemp creates the backup exclusively rather than letting cp follow a
+  # symlink someone left at a predictable .bak name.
+  copy=$(mktemp "$path.bak.$(date +%Y%m%d%H%M%S).XXXXXX") || die "could not create a backup next to $path"
+  chmod 600 -- "$copy"
+  cat -- "$path" > "$copy"
+  info "backed up $(basename -- "$path") -> $(basename -- "$copy")"
 }
 
 # Warn rather than fight: these keys are the user's, and Omarchy's own defaults
@@ -94,6 +142,7 @@ remove_block() {
     fi
   fi
   ((DRY_RUN)) && { info "would remove the shortcuts block"; return 0; }
+  assert_safe_target "$BINDINGS_LUA"
   backup "$BINDINGS_LUA"
   local kept
   kept=$(awk -v b="$begin" -v e="$end" '
@@ -101,10 +150,7 @@ remove_block() {
     !skip { print }
     index($0, e) { skip = 0 }
   ' "$BINDINGS_LUA")
-  local tmp
-  tmp=$(mktemp "$BINDINGS_LUA.XXXXXX")
-  printf '%s\n' "$kept" > "$tmp"
-  mv "$tmp" "$BINDINGS_LUA"
+  printf '%s\n' "$kept" | write_atomic "$BINDINGS_LUA"
   info "shortcuts removed"
 }
 
@@ -124,9 +170,16 @@ add_block() {
   warn_if_bound 68 m "SUPER + CTRL + M"
   warn_if_bound 64 d "SUPER + D"
   ((DRY_RUN)) && { info "would append the shortcuts block to bindings.lua"; return 0; }
-  [[ -f $BINDINGS_LUA ]] || { mkdir -p "$(dirname "$BINDINGS_LUA")"; : > "$BINDINGS_LUA"; }
+  mkdir -p -- "$(dirname -- "$BINDINGS_LUA")"
+  assert_safe_target "$BINDINGS_LUA"
   backup "$BINDINGS_LUA"
-  cat >> "$BINDINGS_LUA" <<LUA
+  # Read the file, add the block, write the whole thing back in one atomic
+  # replace. Appending in place would mean writing to whatever the path
+  # resolves to at that instant, which is exactly what we are avoiding.
+  local existing=""
+  [[ -f $BINDINGS_LUA ]] && existing=$(cat -- "$BINDINGS_LUA")
+  { [[ -n $existing ]] && printf '%s\n' "$existing"
+    cat <<LUA
 
 $BLOCK_BEGIN
 -- Hyprland has no minimized state, so "minimize" parks the window on the
@@ -140,6 +193,7 @@ o.bind("SUPER + D", "Toggle dock", "omarchy-shell dock toggle")
 -- o.bind("SUPER + ALT + D", "Peek at the dock", "omarchy-shell dock peek")
 $BLOCK_END
 LUA
+  } | write_atomic "$BINDINGS_LUA"
   info "shortcuts added to bindings.lua"
 }
 

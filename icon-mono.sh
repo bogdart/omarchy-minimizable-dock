@@ -34,7 +34,22 @@ command -v magick >/dev/null 2>&1 || exit 0
 [[ $px =~ ^[0-9]+$ && $px -gt 0 ]] || exit 0
 [[ $dark =~ ^#[0-9a-fA-F]{6}$ && $light =~ ^#[0-9a-fA-F]{6}$ ]] || exit 0
 
-mkdir -p "$cache" 2>/dev/null || exit 0
+# The cache path is predictable and generated files are written into it by
+# external converters (magick, rsvg-convert), so check before trusting it: a
+# symlink here would redirect every one of those writes. This is best-effort
+# tooling, so anything unexpected bails out quietly and the dock simply keeps
+# the apps' own colour icons.
+[[ -L $cache ]] && { echo "icon-mono: $cache is a symlink; refusing to use it" >&2; exit 0; }
+mkdir -p -m 700 -- "$cache" 2>/dev/null || exit 0
+[[ -d $cache && ! -L $cache ]] || { echo "icon-mono: $cache is not a directory" >&2; exit 0; }
+[[ -O $cache ]] || { echo "icon-mono: $cache is not owned by you; refusing to write there" >&2; exit 0; }
+# Private: nobody else gets to drop files in here between our check and a write.
+chmod 700 -- "$cache" 2>/dev/null || true
+
+# Any temporary file still around when we leave is ours to clean up.
+mono_tmp="" mono_gray=""
+cleanup_tmp() { [[ -n $mono_tmp ]] && rm -f -- "$mono_tmp"; [[ -n $mono_gray ]] && rm -f -- "$mono_gray"; return 0; }
+trap cleanup_tmp EXIT
 
 # The ramp every icon's luminance is looked up in.
 ramp=( \( -size 1x256 "gradient:${dark}-${light}" \) )
@@ -153,8 +168,9 @@ for source in "$@"; do
   [[ -f $path ]] || continue
 
   if [[ ! -f $out || $path -nt $out ]]; then
-    tmp="$out.$$.tmp"
-    gray="$out.$$.gray.png"
+    tmp=$(mktemp "$cache/.mono.XXXXXX") || continue
+    gray=$(mktemp "$cache/.gray.XXXXXX") || { rm -f -- "$tmp"; continue; }
+    mono_tmp=$tmp mono_gray=$gray
     ok=0
     # Rasterise at the target size and reduce to luminance; `-clamp` discards
     # the out-of-range values a resize leaves in transparent pixels.
@@ -165,11 +181,14 @@ for source in "$@"; do
       magick -background none -density 384 "$path" -resize "${px}x${px}" -clamp -colorspace Gray -colorspace sRGB "png32:$gray" 2>/dev/null && ok=1
     fi
     (( ok )) && [[ -s $gray ]] && tint "$gray" "$tmp" || ok=0
-    rm -f "$gray"
+    rm -f -- "$gray"; mono_gray=""
     if (( ok )) && [[ -s $tmp ]]; then
-      mv -f "$tmp" "$out"
+      # Same directory, so this is an atomic replace rather than a partial file
+      # any reader could catch mid-write.
+      mv -f -- "$tmp" "$out"
+      mono_tmp=""
     else
-      rm -f "$tmp"
+      rm -f -- "$tmp"; mono_tmp=""
       continue
     fi
   fi
