@@ -1,9 +1,8 @@
-# Omarchy Minimizable Dock (`bogdart.dock`)
+# Omarchy Minimizable Dock
 
 ![The dock across the bottom of a Hyprland desktop: themed monochrome app icons on a rounded card, the focused app outlined, dots under each icon marking its open windows, and the app launcher button at the far right](docs/screenshot.png)
 
-A dock for [Omarchy](https://omarchy.org/) — the kind you expect from macOS or
-Windows, plus the minimize button Hyprland never had.
+A dock for [Omarchy](https://omarchy.org/) — with theme-matching icons, pinning, minimizing and maximizing.
 
 Your pinned apps sit on the left in the order you choose. Anything else you
 have running appears next to them, and the button on the far right opens
