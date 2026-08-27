@@ -1,13 +1,40 @@
 # Omarchy Minimizable Dock (`bogdart.dock`)
 
-A dock for Hyprland, built as a third-party `omarchy-shell` panel plugin. No
-extra packages: it runs inside the Quickshell process Omarchy already starts,
-and drives Hyprland through its own IPC.
+![The dock across the bottom of a Hyprland desktop: themed monochrome app icons on a rounded card, the focused app outlined, dots under each icon marking its open windows, and the app launcher button at the far right](docs/screenshot.png)
 
-It shows pinned launchers plus every open window grouped by app, and it is the
-other end of "minimize": Hyprland has no minimized window state, so a minimized
-window is parked on the hidden `special:minimized` workspace and the dock is
-what brings it back.
+A dock for [Omarchy](https://omarchy.org/) — the kind you expect from macOS or
+Windows, plus the minimize button Hyprland never had.
+
+Your pinned apps sit on the left in the order you choose. Anything else you
+have running appears next to them, and the button on the far right opens
+Omarchy's app launcher. The icons are re-rendered in your theme's colours, so
+the dock changes with the rest of the desktop instead of being a row of clashing
+logos.
+
+The dots under each icon are that app's windows. A filled dot is a window on
+screen, the accented one is the window you're in, and a hollow dot is one you've
+minimized — if every window of an app is minimized, its icon dims too. The
+outlined icon is the app you're working in right now.
+
+Clicking an icon does what you'd expect:
+
+- **not running** — launches it
+- **running, but you're somewhere else** — brings it forward
+- **the app you're in** — minimizes it, and the window leaves the screen
+- **everything of that app minimized** — brings the last one back, to the
+  workspace it left rather than wherever you happen to be
+
+Hover an icon to see its windows by name and click the one you want. Scroll it
+to walk through them. Right-click for minimize all, restore all, pin, and close.
+
+Minimizing is the part Hyprland genuinely cannot do on its own: it has no
+minimized window state at all. A minimized window is parked on a hidden
+workspace (`special:minimized`), and the dock is what remembers where it came
+from and puts it back. `SUPER + M` minimizes without reaching for the mouse.
+
+Nothing extra to install and nothing extra running: the dock lives inside the
+Quickshell process Omarchy already starts, and drives Hyprland through its own
+IPC.
 
 ## Install
 
