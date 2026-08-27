@@ -70,10 +70,21 @@ system's terminal, browser, and file manager — read from `xdg-terminals.list`,
 `xdg-settings`, and `xdg-mime` — then reloads Hyprland, restarts the shell, and
 checks that the dock answers IPC.
 
-Every file it edits is backed up first and every edit is marked, so
-`--uninstall` removes them without disturbing anything else in those files.
-Re-running is safe: settings already in `shell.json` are kept (use
-`--reset-config` to overwrite them) and the Hyprland blocks are added once.
+Nothing you already have is rewritten. The Hyprland edits are *appended* as a
+marked block, leaving every existing line in place; the `shell.json` change only
+adds or updates this plugin's own entry, keyed by its id, and keeps the settings
+already in it (`--reset-config` opts into overwriting them). Every file is
+backed up first, and because each edit is marked, `--uninstall` removes exactly
+those blocks and nothing else.
+
+One thing to know before running it: because the keybindings are appended, they
+take precedence over an earlier binding of the same keys. If `SUPER + M`,
+`SUPER + CTRL + M`, or `SUPER + D` is already bound on your system, the
+installer prints a warning naming the binding it is shadowing and carries on —
+your original line is untouched in the file and comes back when the block is
+removed. Use `--no-keys` to skip the keybindings entirely, or `--dry-run` to see
+every change before any of it happens.
+
 Override the pinned apps with `--pinned "com.mitchellh.ghostty,chromium,obsidian"`,
 and see `--help` for the rest (`--autohide`, `--no-keys`, `--no-restart`).
 
@@ -267,3 +278,14 @@ any time and it is rebuilt on the next shell start, and
   missed.
 - Files: `Dock.qml` (windows, actions, IPC), `DockItem.qml` (one icon),
   `DockModel.js` (class matching, grouping, and the structural signature).
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+External dependencies: none bundled and nothing vendored. At runtime the dock
+uses only what Omarchy already ships — Quickshell (it runs as a plugin inside
+the existing `omarchy-shell` process), Hyprland 0.56 or newer for its Lua IPC,
+`jq` for the installer, and ImageMagick for the monochrome icon rendering, which
+it degrades gracefully without. The screenshot in this README is of the author's
+own desktop.
