@@ -37,15 +37,40 @@ IPC.
 
 ## Install
 
-```bash
-omarchy plugin add https://github.com/bogdart/omarchy-minimizable-dock.git --enable
+Open the Omarchy menu with `SUPER + SPACE`, type `plu`, and pick
+**Plugins → Add Plugin**. A small terminal appears and asks for a git URL —
+paste this one:
+
+```
+https://github.com/bogdart/omarchy-minimizable-dock.git
 ```
 
-That clones this repo into `~/.config/omarchy/plugins/bogdart.dock/`, validates
-the manifest, and enables the plugin. Nothing in this repo runs at install time:
-`omarchy plugin add` executes no hooks and never asks for sudo. Later,
-`omarchy plugin update bogdart.dock` fast-forwards to the newest commit, and
-`omarchy plugin remove bogdart.dock` takes it away again.
+Omarchy reminds you that plugins are unsandboxed code and asks you to confirm,
+then downloads it, checks the manifest, and offers to enable it. Say yes and the
+dock is there.
+
+Nothing in this repo is executed while it installs: Omarchy runs no setup
+scripts from a plugin and never asks for your password.
+
+### Removing or pausing it
+
+The same menu, `SUPER + SPACE` → **Plugins**:
+
+- **Remove Plugin** — deletes it and its entry
+- **Disable Plugin** — parks it without deleting it, so **Enable Plugin** brings
+  it straight back
+
+<details>
+<summary>Prefer a terminal?</summary>
+
+```bash
+omarchy plugin add https://github.com/bogdart/omarchy-minimizable-dock.git --enable
+omarchy plugin update bogdart.dock    # pull the newest version
+omarchy plugin disable bogdart.dock
+omarchy plugin remove bogdart.dock
+```
+
+</details>
 
 Requirements: Omarchy with the Quickshell shell (`$OMARCHY_PATH/shell`),
 Hyprland 0.56 or newer (its Lua IPC is what minimize and focus use), and `jq`.
@@ -54,8 +79,10 @@ it the dock falls back to the apps' own colour icons.
 
 ### Optional: keybindings, the layer rule, and pinned-app detection
 
-Because `omarchy plugin add` runs nothing, three things it cannot do for you are
-what `install.sh` in this repo is for:
+Because Omarchy deliberately runs nothing from a plugin when it installs one,
+three conveniences are left over. They are entirely optional — the dock works
+without them — and `install.sh` in this repo is what sets them up, if you clone
+the repo and run it yourself:
 
 ```bash
 ./install.sh                # set up the extras
