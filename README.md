@@ -77,46 +77,46 @@ Hyprland 0.56 or newer (its Lua IPC is what minimize and focus use), and `jq`.
 ImageMagick (`magick`, stock on Omarchy) renders the monochrome icons; without
 it the dock falls back to the apps' own colour icons.
 
-### Optional: keybindings, the layer rule, and pinned-app detection
+### Optional: keyboard shortcuts
 
-Because Omarchy deliberately runs nothing from a plugin when it installs one,
-three conveniences are left over. They are entirely optional — the dock works
-without them — and `install.sh` in this repo is what sets them up, if you clone
-the repo and run it yourself:
+The dock needs nothing else to work. It reads this system's terminal, browser,
+and file manager for its own defaults, and claims its own Hyprland layer rule
+when it starts, so there is no configuration step.
+
+Keyboard shortcuts are the one thing a plugin genuinely cannot set up for
+itself, because they live in your Hyprland config and Omarchy never runs code
+from a plugin. If you want them, clone the repo and run:
 
 ```bash
-./install.sh                # set up the extras
-./install.sh --dry-run      # show what it would change, change nothing
-./install.sh --uninstall    # remove the dock and every edit it made
+./shortcuts.sh              # add the keybindings
+./shortcuts.sh --dry-run    # show what would change, change nothing
+./shortcuts.sh --uninstall  # remove them again
 ```
 
-It appends a marked block to `hypr/bindings.lua` (`SUPER + M`,
-`SUPER + CTRL + M`, `SUPER + D`) and to `hypr/looknfeel.lua` (the dock's layer
-rule), writes a `shell.json` entry whose pinned apps are detected from this
-system's terminal, browser, and file manager — read from `xdg-terminals.list`,
-`xdg-settings`, and `xdg-mime` — then reloads Hyprland, restarts the shell, and
-checks that the dock answers IPC.
+| | |
+|---|---|
+| `SUPER + M` | minimize the focused window to the dock |
+| `SUPER + CTRL + M` | restore the last minimized window |
+| `SUPER + D` | hide/show the dock |
 
-Nothing you already have is rewritten. The Hyprland edits are *appended* as a
-marked block, leaving every existing line in place; the `shell.json` change only
-adds or updates this plugin's own entry, keyed by its id, and keeps the settings
-already in it (`--reset-config` opts into overwriting them). Every file is
-backed up first, and because each edit is marked, `--uninstall` removes exactly
-those blocks and nothing else.
+It touches exactly one file, `~/.config/hypr/bindings.lua`, appending a marked
+block. Nothing you already have is rewritten — your existing lines stay where
+they are, the file is backed up first, and `--uninstall` removes that block and
+nothing else.
 
-One thing to know before running it: because the keybindings are appended, they
-take precedence over an earlier binding of the same keys. If `SUPER + M`,
-`SUPER + CTRL + M`, or `SUPER + D` is already bound on your system, the
-installer prints a warning naming the binding it is shadowing and carries on —
-your original line is untouched in the file and comes back when the block is
-removed. Use `--no-keys` to skip the keybindings entirely, or `--dry-run` to see
-every change before any of it happens.
+One thing to know: because the block is appended, its bindings take precedence
+over an earlier binding of the same keys. If any of the three is already bound,
+the script warns you and names what it is shadowing rather than deciding for
+you; your original line is still in the file and works again once the block is
+removed.
 
-Override the pinned apps with `--pinned "com.mitchellh.ghostty,chromium,obsidian"`,
-and see `--help` for the rest (`--autohide`, `--no-keys`, `--no-restart`).
+Or skip the script and paste this into `~/.config/hypr/bindings.lua` yourself:
 
-Running `install.sh` from a clone is also a complete install on its own, if you
-would rather not use `omarchy plugin add`.
+```lua
+o.bind("SUPER + M", "Minimize window to dock", hl.dsp.window.move({ workspace = "special:minimized", follow = false }))
+o.bind("SUPER + CTRL + M", "Restore last minimized window", "omarchy-shell dock restore")
+o.bind("SUPER + D", "Toggle dock", "omarchy-shell dock toggle")
+```
 
 ## Layout
 
@@ -266,8 +266,8 @@ an icon in a given theme:
 
 A source that cannot be rendered keeps its original icon. Folders no theme
 has used for two weeks are pruned automatically; delete the whole cache at
-any time and it is rebuilt on the next shell start, and
-`install.sh --uninstall` removes it.
+any time and it is rebuilt on the next shell start. Removing the plugin leaves
+the cache behind — `rm -rf ~/.cache/bogdart.dock` clears it.
 
 ## Notes
 

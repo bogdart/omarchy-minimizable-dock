@@ -59,16 +59,43 @@ Item {
     var value = Number(setting("opacity", 0.92))
     return isFinite(value) ? Math.max(0.3, Math.min(1, value)) : 0.92
   }
+  // An explicit list always wins, including an empty one — unpinning
+  // everything writes `[]` and must stay empty. Only a missing key falls back
+  // to this system's own apps, so a dock installed from the menu opens with
+  // something in it instead of a bare strip.
   readonly property var pinned: {
     var value = setting("pinned", null)
-    return value && value.length !== undefined ? value : []
+    if (value && value.length !== undefined) return value
+    var out = []
+    if (root.detectedTerminal) out.push(root.detectedTerminal)
+    if (root.detectedBrowser) out.push(root.detectedBrowser)
+    if (root.detectedFiles) out.push(root.detectedFiles)
+    return out
   }
   // Window classes that should be treated as another app: Omarchy launches its
   // terminals and TUIs with synthetic app-ids (org.omarchy.terminal, TUI.float)
   // that have no desktop entry of their own.
+  // Detected first, configured on top: a user alias overrides the default for
+  // the same class, and everything else keeps working with no configuration.
   readonly property var aliases: {
+    var out = ({})
+    for (var key in root.defaultAliases) out[key] = root.defaultAliases[key]
     var value = setting("aliases", null)
-    return value && typeof value === "object" ? value : ({})
+    if (value && typeof value === "object")
+      for (var extra in value) out[extra] = value[extra]
+    return out
+  }
+
+  readonly property var defaultAliases: {
+    var out = ({})
+    var terminal = root.detectedTerminal
+    if (terminal) {
+      out["org.omarchy.terminal"] = terminal
+      out["org.omarchy.bash"] = terminal
+      out["TUI.float"] = terminal
+    }
+    if (root.entryIndex["btop"]) out["org.omarchy.btop"] = "btop"
+    return out
   }
   // Shell-owned surfaces are real toplevels on Hyprland (the Omarchy
   // screensaver and lock windows among them) but they are not apps, so they
@@ -79,6 +106,120 @@ Item {
     if (extra && extra.length !== undefined)
       for (var i = 0; i < extra.length; i++) ignored[String(extra[i]).toLowerCase()] = true
     return ignored
+  }
+
+  // -------------------------------------------------- this system's apps
+  // Omarchy launches its terminals and TUIs with synthetic window classes
+  // (org.omarchy.terminal, TUI.float) that have no desktop entry of their own,
+  // so they only group under the right icon once they are pointed at whichever
+  // terminal this system actually uses. The same answer, plus the default
+  // browser and file manager, is what a dock with nothing configured pins.
+  //
+  // All of it is read straight from the XDG files rather than written into
+  // shell.json by an installer, so a plugin installed from the menu — which
+  // deliberately runs no setup script — behaves correctly with no setup at all.
+  readonly property string homeDir: String(Quickshell.env("HOME") || "")
+
+  property string detectedTerminal: ""
+  property string detectedBrowser: ""
+  property string detectedFiles: ""
+
+  property string terminalsUserText: ""
+  property string terminalsSystemText: ""
+  property string mimeUserText: ""
+  property string mimeSystemText: ""
+
+  // "com.mitchellh.ghostty.desktop" per line, # comments, most preferred first.
+  function parseTerminalsList(text) {
+    var out = []
+    var lines = String(text || "").split("\n")
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i]
+      var hash = line.indexOf("#")
+      if (hash !== -1) line = line.substring(0, hash)
+      line = line.replace(/\s+/g, "")
+      if (line.length > 0) out.push(DockModel.stripDesktopSuffix(line))
+    }
+    return out
+  }
+
+  // "inode/directory=org.gnome.Nautilus.desktop", possibly several separated
+  // by semicolons, under any section of a mimeapps.list.
+  function parseMimeApps(text, key) {
+    var out = []
+    var lines = String(text || "").split("\n")
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].replace(/^\s+|\s+$/g, "")
+      if (line.indexOf(key + "=") !== 0) continue
+      var values = line.substring(key.length + 1).split(";")
+      for (var v = 0; v < values.length; v++) {
+        var id = DockModel.stripDesktopSuffix(values[v].replace(/\s+/g, ""))
+        if (id.length > 0) out.push(id)
+      }
+    }
+    return out
+  }
+
+  // The first candidate this system actually has a desktop entry for. Without
+  // one there is nothing to launch, so an unknown id is no answer at all.
+  function firstKnownEntry(ids) {
+    for (var i = 0; i < ids.length; i++) {
+      var entry = root.entryIndex[DockModel.normalizeKey(ids[i])]
+      if (entry) return String(entry.id ? entry.id : ids[i])
+    }
+    return ""
+  }
+
+  function recomputeSystemApps() {
+    var terminals = root.parseTerminalsList(root.terminalsUserText)
+      .concat(root.parseTerminalsList(root.terminalsSystemText))
+      // Nothing listed, or nothing listed that exists: fall back to the
+      // terminals Omarchy is actually likely to have installed.
+      .concat(["com.mitchellh.ghostty", "org.codeberg.dnkl.foot", "Alacritty",
+               "kitty", "org.wezfurlong.wezterm"])
+    root.detectedTerminal = root.firstKnownEntry(terminals)
+
+    root.detectedBrowser = root.firstKnownEntry(
+      root.parseMimeApps(root.mimeUserText, "x-scheme-handler/http")
+        .concat(root.parseMimeApps(root.mimeUserText, "x-scheme-handler/https"))
+        .concat(root.parseMimeApps(root.mimeSystemText, "x-scheme-handler/http"))
+        .concat(root.parseMimeApps(root.mimeSystemText, "x-scheme-handler/https")))
+
+    root.detectedFiles = root.firstKnownEntry(
+      root.parseMimeApps(root.mimeUserText, "inode/directory")
+        .concat(root.parseMimeApps(root.mimeSystemText, "inode/directory")))
+  }
+
+  FileView {
+    path: root.homeDir + "/.config/xdg-terminals.list"
+    watchChanges: true
+    printErrors: false
+    onLoaded: { root.terminalsUserText = text(); root.recomputeSystemApps() }
+    onLoadFailed: { root.terminalsUserText = ""; root.recomputeSystemApps() }
+    onFileChanged: reload()
+  }
+
+  FileView {
+    path: "/etc/xdg/xdg-terminals.list"
+    printErrors: false
+    onLoaded: { root.terminalsSystemText = text(); root.recomputeSystemApps() }
+    onLoadFailed: { root.terminalsSystemText = ""; root.recomputeSystemApps() }
+  }
+
+  FileView {
+    path: root.homeDir + "/.config/mimeapps.list"
+    watchChanges: true
+    printErrors: false
+    onLoaded: { root.mimeUserText = text(); root.recomputeSystemApps() }
+    onLoadFailed: { root.mimeUserText = ""; root.recomputeSystemApps() }
+    onFileChanged: reload()
+  }
+
+  FileView {
+    path: "/usr/share/applications/mimeapps.list"
+    printErrors: false
+    onLoaded: { root.mimeSystemText = text(); root.recomputeSystemApps() }
+    onLoadFailed: { root.mimeSystemText = ""; root.recomputeSystemApps() }
   }
 
   // ------------------------------------------------------------- geometry
@@ -170,6 +311,7 @@ Item {
     classIndex = byClass
     webappIndex = byUrl
     resolveCache = ({})
+    root.recomputeSystemApps()
     scheduleRebuild()
   }
 
@@ -953,6 +1095,18 @@ Item {
   Component.onCompleted: {
     root.rebuildIndexes()
     Hyprland.refreshToplevels()
+    root.claimLayerRule()
+  }
+
+  // The dock animates its own slide, so Hyprland must not animate the layer
+  // surface a second time. Hyprland 0.56 refuses `hyprctl keyword` under its
+  // Lua parser ("keyword can't work with non-legacy parsers, use eval"), so the
+  // rule goes in through eval. Applying it here rather than asking the user to
+  // paste a rule into looknfeel.lua keeps the plugin self-contained; it is
+  // scoped to this dock's own namespace and touches nothing else.
+  function claimLayerRule() {
+    Quickshell.execDetached(["hyprctl", "eval",
+      'hl.layer_rule({ match = { namespace = "omarchy-dock" }, no_anim = true, animation = "none" })'])
   }
 
   // Icon themes and desktop entries can land after the shell starts (a fresh
