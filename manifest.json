@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "bogdart.dock",
+  "name": "Dock",
+  "version": "1.2.0",
+  "author": "bogdart",
+  "license": "MIT",
+  "description": "Bottom dock with pinned launchers, open-window icons, and minimize-to-dock via the special:minimized workspace.",
+  "kinds": [
+    "panel"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "panel": "Dock.qml"
+  }
+}

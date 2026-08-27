@@ -1,0 +1,6 @@
+# Timestamped backups written by install.sh and by ad-hoc edits. These are
+# local safety copies, never part of the plugin the shell loads.
+*.bak
+*.bak.*
+*.orig
+*.rej
