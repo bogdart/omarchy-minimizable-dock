@@ -2,93 +2,114 @@
 
 ![The dock across the bottom of a Hyprland desktop: themed monochrome app icons on a rounded card, the focused app outlined, dots under each icon marking its open windows, and the app launcher button at the far right](docs/screenshot.png)
 
-A dock for [Omarchy](https://omarchy.org/) — with theme-matching icons, pinning, minimizing and maximizing.
+A dock for [Omarchy](https://omarchy.org/) — with theme-matching icons,
+pinning, minimizing and maximizing.
 
-Your pinned apps sit on the left in the order you choose. Anything else you
-have running appears next to them, and the button on the far right opens
-Omarchy's app launcher. The icons are re-rendered in your theme's colours, so
-the dock changes with the rest of the desktop instead of being a row of clashing
-logos.
+Hyprland has no minimize button. A window is on a workspace or it is closed,
+and there is nothing in between. This dock adds the missing state. Click the
+icon of the app you are in and its window leaves the screen. Click again and it
+is back, exactly where it was. Nothing stops in between: the video keeps
+playing, the build keeps running.
 
-The dots under each icon are that app's windows. A filled dot is a window on
-screen, the accented one is the window you're in, and a hollow dot is one you've
-minimized — if every window of an app is minimized, its icon dims too. The
-outlined icon is the app you're working in right now.
+The dock also looks like part of your desktop, not an add-on. Every icon is
+redrawn in your theme's own colours, so the dock follows every theme change
+instead of showing a row of clashing vendor logos. Pin the apps you use daily;
+everything else appears while it runs.
 
-Clicking an icon does what you'd expect:
+It works out of the box. Install it from the Omarchy menu and the dock comes up
+with your terminal, browser and file manager already pinned. It runs inside the
+shell Omarchy already starts, so there is no new process, no dependency, and
+nothing to configure.
 
-- **not running** — launches it
-- **running, but you're somewhere else** — brings it forward
-- **the app you're in** — minimizes it, and the window leaves the screen
-- **everything of that app minimized** — brings the last one back, to the
-  workspace it left rather than wherever you happen to be
+## The dock
 
-Hover an icon to see its windows by name and click the one you want. Scroll it
-to walk through them. Right-click for minimize all, restore all, pin, and close.
+The dock sits at the bottom of the screen. It holds two sets of icons. First
+your pinned apps, in the order you choose. These stay in place even when the app
+is closed. Then any app that is running but not pinned. The button at the far
+right opens Omarchy's app menu.
 
-Minimizing is the part Hyprland genuinely cannot do on its own: it has no
-minimized window state at all. A minimized window is parked on a hidden
-workspace (`special:minimized`), and the dock is what remembers where it came
-from and puts it back — all of it from the mouse, with optional keyboard
-shortcuts you can add yourself.
+Small dots under each icon show that app's windows, up to four:
 
-Nothing extra to install and nothing extra running: the dock lives inside the
-Quickshell process Omarchy already starts, and drives Hyprland through its own
-IPC.
+| Dot | Meaning |
+|---|---|
+| accent | this window is focused |
+| filled | window is open |
+| hollow | window is minimized |
+| none | pinned, not running |
+
+The icon dims when every window of an app is minimized. The focused app's icon
+is outlined.
+
+By default the dock hides itself. Move the pointer to the bottom of the screen
+to bring it back. It also stays up on an empty workspace, and peeks for a moment
+after you minimize a window. Set `"autohide": false` to keep it on screen. In
+that mode it reserves its height and windows tile above it.
+
+## Minimizing windows
+
+Minimizing moves the window to a hidden workspace called `special:minimized`.
+The window keeps running there. The dock is how you get it back. It remembers
+which workspace the window came from and returns it there, not to wherever you
+happen to be.
+
+A left click on an icon resolves in this order:
+
+1. The app is not running. Launch it.
+2. The app holds focus. Minimize the focused window.
+3. The app has a window on screen. Focus the one you used last.
+4. Every window of the app is minimized. Restore the one minimized last.
+
+On screen always beats minimized. While an app still has a visible window, a
+click switches to it instead of pulling one out of the minimized workspace.
+Click again to bring back the next window.
 
 ## Install
 
-Open the Omarchy menu with `SUPER + SPACE`, type `plu`, and pick
-**Plugins → Add Plugin**. A small terminal appears and asks for a git URL —
-paste this one:
+Open the Omarchy menu with `SUPER + SPACE`. Type `plu` and pick
+**Plugins → Add Plugin**. Paste this URL:
 
 ```
 https://github.com/bogdart/omarchy-minimizable-dock.git
 ```
 
-Omarchy reminds you that plugins are unsandboxed code and asks you to confirm,
-then downloads it, checks the manifest, and offers to enable it. Say yes and the
-dock is there.
+Omarchy warns you that plugins are unsandboxed code and asks you to confirm. It
+then installs the plugin and offers to enable it. Nothing in this repo runs
+during install and it never asks for your password.
 
-Nothing in this repo is executed while it installs: Omarchy runs no setup
-scripts from a plugin and never asks for your password.
-
-### Removing or pausing it
-
-The same menu, `SUPER + SPACE` → **Plugins**:
-
-- **Remove Plugin** — deletes it and its entry
-- **Disable Plugin** — parks it without deleting it, so **Enable Plugin** brings
-  it straight back
+To remove it, use the same menu: **Plugins → Remove Plugin**. **Disable Plugin**
+turns it off without deleting it.
 
 <details>
-<summary>Prefer a terminal?</summary>
+<summary>From a terminal</summary>
 
 ```bash
 omarchy plugin add https://github.com/bogdart/omarchy-minimizable-dock.git --enable
-omarchy plugin update bogdart.dock    # pull the newest version
+omarchy plugin update bogdart.dock
 omarchy plugin disable bogdart.dock
 omarchy plugin remove bogdart.dock
 ```
 
 </details>
 
-Requirements: Omarchy with the Quickshell shell (`$OMARCHY_PATH/shell`) and
-Hyprland 0.56 or newer, whose Lua IPC is what minimize and focus use.
-ImageMagick (`magick`, stock on Omarchy) renders the monochrome icons; without
-it the dock falls back to the apps' own colour icons. Nothing else is needed and
-nothing is bundled.
+## Mouse
 
-### Optional: keyboard shortcuts
+| Action | Result |
+|---|---|
+| left click | launch, focus, or minimize, as listed above |
+| middle click | open a new window |
+| right click | menu: window list, new window, restore all, minimize all, pin, close |
+| scroll | step through that app's windows |
+| hover | list of that app's windows by name |
 
-The dock needs nothing else to work. It reads this system's terminal, browser,
-and file manager for its own defaults, and claims its own Hyprland layer rule
-when it starts, so there is no configuration step and no setup script.
+In the hover list, left click switches to a window or restores it, right click
+minimizes it, and middle click closes it. The list stays open after a right or
+middle click so you can act on several windows.
 
-Keyboard shortcuts are the one thing a plugin cannot set up for itself, because
-they live in your Hyprland config and Omarchy never runs code from a plugin. If
-you want them, paste these at the end of `~/.config/hypr/bindings.lua` and run
-`hyprctl reload`:
+## Keyboard shortcuts
+
+The plugin adds no keybindings. Omarchy does not let a plugin edit your Hyprland
+config, so add them yourself if you want them. Paste into
+`~/.config/hypr/bindings.lua` and run `hyprctl reload`:
 
 ```lua
 o.bind("SUPER + M", "Minimize window to dock", hl.dsp.window.move({ workspace = "special:minimized", follow = false }))
@@ -96,110 +117,19 @@ o.bind("SUPER + CTRL + M", "Restore last minimized window", "omarchy-shell dock 
 o.bind("SUPER + D", "Toggle dock", "omarchy-shell dock toggle")
 ```
 
-| | |
-|---|---|
-| `SUPER + M` | minimize the focused window to the dock |
-| `SUPER + CTRL + M` | restore the last minimized window |
-| `SUPER + D` | hide/show the dock |
-
-Deleting those three lines removes them again. They are ordinary Hyprland
-bindings that reach the dock through its `dock` IPC target rather than through
-the plugin, so they survive reinstalls and keep working even under a different
-plugin id. Two more are available if you want them:
+Delete the lines to remove them. Two more are available:
 
 ```lua
 o.bind("SUPER + ALT + M", "Restore all minimized windows", "omarchy-shell dock restoreAll")
 o.bind("SUPER + ALT + D", "Peek at the dock", "omarchy-shell dock peek")
 ```
 
-Minimize and restore are fully usable without them — click a focused app's icon
-to minimize it, click again to bring it back — so skipping the shortcuts costs
-you only the keyboard route. Hiding the dock is the one thing with no mouse
-equivalent: with `autohide` on it reveals itself at the screen edge anyway, and
-`omarchy-shell dock toggle` does it from a terminal.
-
-## Layout
-
-```
-[ pinned apps ] │ [ running apps that aren't pinned ] │ [ all apps ]
-```
-
-Each icon sits in the exact vertical middle of the card, with the same
-breathing room above and below; the window dots live in the padding on the
-screen-edge side.
-
-The last cell opens Omarchy's own apps menu (the same one as
-`SUPER + ALT + SPACE`); set `"appsButton": false` to drop it.
-
-Under each icon:
-
-| Indicator | Meaning |
-|---|---|
-| accent dot | that window is focused |
-| filled dot | open window on some workspace |
-| hollow dot + icon at half opacity | window is minimized (parked on `special:minimized`); the icon dims only when every window of the app is |
-| no dot | pinned, not running |
-
-One dot per window, up to four.
-
-## Showing and hiding
-
-By default the dock autohides: it slides away while a window is on the
-workspace, and reveals itself when the pointer touches the bottom edge of the
-screen. Two things bring it back on their own:
-
-- **an empty workspace** — with nothing on screen there is nothing to hide
-  from, so the dock simply stays up (per monitor, so a full screen next to a
-  bare one behaves correctly);
-- **minimizing a window** — the dock peeks for a moment so it is visible where
-  the window just went.
-
-Set `"autohide": false` to keep it on screen permanently instead; that mode
-reserves its height, so windows tile above it.
-
-## Mouse
-
-| Action | Result |
-|---|---|
-| left click, not running | launch the app |
-| left click, app holds focus | minimize the window that holds it, however many windows the app has |
-| left click, a window is on screen | raise the most recently used one |
-| left click, every window minimized | bring one back, most recently minimized first — click again for the next |
-| middle click | new window / new instance |
-| right click | menu: window list, new window, restore all, minimize all, pin/unpin, close |
-| scroll | cycle that app's windows |
-| hover | window list — per-window controls: left = switch/restore, right = minimize (list stays open), middle = close |
-
-The hover list is reachable: it opens flush against the dock, the pointer can
-walk from the icon into it, and the dock stays put while the pointer is inside
-the list or the menu.
-
-## Keys
-
-The dock ships no keybindings — see
-[Optional: keyboard shortcuts](#optional-keyboard-shortcuts) for the lines to
-add if you want them. Once added, `SUPER + M` is a plain Hyprland dispatcher, so
-minimizing keeps working even while the shell is restarting; the dock only
-supplies the way back.
-
-## Commands
-
-```bash
-omarchy-shell dock state        # position, autohide, item count, minimized count
-omarchy-shell dock minimized    # list minimized windows
-omarchy-shell dock minimize     # minimize the active window
-omarchy-shell dock restore      # restore the most recently minimized window
-omarchy-shell dock restoreAll   # restore every minimized window
-omarchy-shell dock toggle       # hide/show
-omarchy-shell dock peek         # reveal briefly (autohide mode)
-omarchy-shell dock activate <app>  # act as if that icon were clicked
-omarchy-shell dock debug        # per-screen reveal/hover state
-```
+Minimize and restore work from the mouse without any of these.
 
 ## Configuration
 
 The dock reads its own entry in `~/.config/omarchy/shell.json` under
-`plugins[]`, and picks up edits to that file without a restart:
+`plugins[]`. Edits apply without a restart.
 
 ```json
 {
@@ -207,112 +137,52 @@ The dock reads its own entry in `~/.config/omarchy/shell.json` under
   "position": "bottom",
   "autohide": true,
   "iconSize": 40,
-  "opacity": 0.92,
   "monochrome": true,
-  "onlyCurrentWorkspace": false,
-  "appsButton": true,
-  "pinned": ["com.mitchellh.ghostty", "chromium", "org.gnome.Nautilus", "obsidian"],
-  "aliases": { "org.omarchy.terminal": "com.mitchellh.ghostty" },
-  "ignore": []
+  "pinned": ["com.mitchellh.ghostty", "chromium"]
 }
 ```
 
 | Key | Default | What it does |
 |---|---|---|
 | `position` | `bottom` | `bottom` or `top` |
-| `autohide` | `true` | `true` parks the dock off-screen, revealing it on a pointer at that screen edge, on an empty workspace, and briefly after a minimize. `false` keeps it visible and reserves space so windows tile above it |
-| `iconSize` | `40` | icon size in logical pixels (20–96) |
-| `opacity` | `0.92` | dock background opacity |
-| `monochrome` | `true` | redraw every icon in shades of one theme colour (see below). `false` shows the apps' icons as shipped |
-| `monochromeColor` | `frame` | the ink: `frame` is the dock's border colour (the theme accent), `foreground` the theme's text colour |
-| `onlyCurrentWorkspace` | `false` | `true` shows only windows on the focused workspace — minimized windows always show |
-| `appsButton` | `true` | the trailing button that opens Omarchy's apps menu |
-| `pinned` | detected | desktop entry ids, in dock order. Left out, the dock pins this system's terminal, browser, and file manager; an explicit list always wins, including an empty one. Right-click → Pin/Unpin edits this list for you |
-| `aliases` | detected | window class → desktop entry id, for windows whose class has no entry of its own. Omarchy's `org.omarchy.terminal`, `org.omarchy.bash`, `TUI.float` and `org.omarchy.btop` are mapped for you; anything set here is layered on top |
-| `ignore` | `[]` | extra window classes to keep out of the dock. Always ignored: `org.quickshell`, `org.omarchy.screensaver`, the input methods (`fcitx`, `fcitx5`, `ibus` and friends), and any surface that reports no app id at all |
+| `autohide` | `true` | hide the dock until the pointer reaches the screen edge |
+| `iconSize` | `40` | icon size in logical pixels, 20 to 96 |
+| `opacity` | `0.92` | background opacity |
+| `monochrome` | `true` | redraw icons in one theme colour. `false` uses the apps' own icons |
+| `monochromeColor` | `frame` | which colour to use, `frame` or `foreground` |
+| `onlyCurrentWorkspace` | `false` | show only windows on the current workspace. Minimized windows always show |
+| `appsButton` | `true` | show the app menu button |
+| `pinned` | detected | desktop entry ids, in dock order. Left out, the dock pins this system's terminal, browser, and file manager. Right-click an icon to pin or unpin |
+| `aliases` | detected | window class to desktop entry id, for windows with no entry of their own |
+| `ignore` | `[]` | extra window classes to keep out of the dock |
 
-Pinned ids are desktop entry ids without `.desktop`; `omarchy plugin list` and
-`ls /usr/share/applications ~/.local/share/applications` are the places to find
-them.
+The dock always hides `org.quickshell`, `org.omarchy.screensaver`, input methods
+such as fcitx and ibus, and any window that reports no app id.
 
-## Monochrome icons
+Icons are redrawn in one theme colour and cached under
+`~/.cache/bogdart.dock/icons/`. A theme change renders a new set. An icon that
+cannot be rendered keeps its original. Removing the plugin leaves the cache
+behind. Delete it with `rm -rf ~/.cache/bogdart.dock`.
 
-With `monochrome` on, every app icon is reduced to its luminance, normalised
-so each icon spans the full range (a pale icon gets the same depth as a dark
-one), and that luminance is mapped onto the ramp between one ink colour and
-the theme background. The ink is the dock's own frame colour by default, so
-an icon's body is exactly the frame's colour, its highlights fade toward the
-background, and nothing in it is ever darker than the frame (on a dark
-theme: brighter). `"monochromeColor": "foreground"` uses the theme's text
-colour instead.
+## Commands
 
-Renderings are produced once by `icon-mono.sh` (ImageMagick, plus
-`rsvg-convert` for SVG sources) and cached in
-`~/.cache/bogdart.dock/icons/<px>-<dark>-<light>/`, keyed by icon size and the
-ramp's two colours, so the dock only pays for a render the first time it sees
-an icon in a given theme:
+```bash
+omarchy-shell dock state           # position, autohide, item count, minimized count
+omarchy-shell dock minimize        # minimize the active window
+omarchy-shell dock restore         # restore the most recently minimized window
+omarchy-shell dock restoreAll      # restore every minimized window
+omarchy-shell dock minimized       # list minimized windows
+omarchy-shell dock toggle          # hide or show the dock
+omarchy-shell dock peek            # reveal briefly
+omarchy-shell dock activate <app>  # act as if that icon were clicked
+```
 
-- **theme change** — the shell's colours change, the cache key changes, and
-  the dock renders the new set (the old one stays on disk, so switching back
-  is instant);
-- **a newly installed app** — its icon is rendered the moment it appears on
-  the dock, and the original icon shows until then;
-- **icon size, ink, or screen density change** — a new key, a new render.
+## Requirements
 
-A source that cannot be rendered keeps its original icon. Folders no theme
-has used for two weeks are pruned automatically; delete the whole cache at
-any time and it is rebuilt on the next shell start. Removing the plugin leaves
-the cache behind — `rm -rf ~/.cache/bogdart.dock` clears it.
-
-## Notes
-
-- Web app windows (Chromium `--app=`) are matched back to their Omarchy
-  launcher by URL, so a pinned web app lights up when its window opens.
-- Minimized windows survive on the special workspace; nothing unmaps them, so
-  a video keeps playing and a build keeps running.
-- Restoring returns a window to the workspace it was minimized from and
-  focuses it there. Only a window with no remembered home (minimized before
-  the shell started) falls back to the current workspace.
-- `special:minimized` is deliberately separate from Omarchy's
-  `special:scratchpad` (`SUPER + ALT + S`), so the two do not mix.
-- Editing this plugin's QML: `shell.json` hot-reloads, but plugin code changes
-  need `omarchy restart shell` to take effect reliably.
-- A left click resolves in a fixed order: focused beats on-screen, and
-  on-screen beats minimized. While an app still has a visible window to switch
-  to, a click switches to it rather than digging another one out of the
-  minimized workspace; only when nothing of the app is left on screen does a
-  click restore, one window per click, so a second parked window stays
-  reachable. Walking between an app's windows is the scroll wheel's job.
-- A window parked on `special:minimized` never counts as focused, even though
-  Hyprland can leave it as the active window when it was the last one on its
-  workspace. Counting it would make a click minimize it again, with no way
-  back.
-- Only *which* icons exist and their order come from a snapshot, rebuilt when
-  that structure changes; a snapshot is held back for at most a second while
-  the pointer is on the dock so the row cannot reflow under a click. Everything
-  the dock *reports* — window counts, focus, the minimized markers, titles,
-  icons — is bound to live state, so what you see cannot drift from what
-  Hyprland actually has. Every *action* re-reads the app by key for the same
-  reason: the snapshot a cell was built from carries focus and minimize state
-  frozen at that moment, which is fine for drawing the row and useless for
-  deciding what a click means. A stuck pointer state can therefore never leave stale
-  indicators on screen, and a watchdog releases hover if a leave event is ever
-  missed.
-- Surfaces that report no app id are skipped entirely. Input-method candidate
-  windows, tooltips, and stray override-redirect X11 surfaces all arrive that
-  way; there is no launcher behind them and nothing to switch to, so they used
-  to appear as a `?` icon named "Unknown" — the resolver's way of saying it had
-  nothing to work with.
-- Files: `Dock.qml` (windows, actions, IPC), `DockItem.qml` (one icon),
-  `DockModel.js` (class matching, grouping, and the structural signature), and
-  `icon-mono.sh` (the ImageMagick icon rendering). No installer, no setup step.
+Omarchy with the Quickshell shell, and Hyprland 0.56 or newer. ImageMagick
+renders the monochrome icons. Without it the dock uses the apps' own icons.
+Nothing is bundled and nothing is vendored.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
-External dependencies: none bundled and nothing vendored. At runtime the dock
-uses only what Omarchy already ships — Quickshell (it runs as a plugin inside
-the existing `omarchy-shell` process), Hyprland 0.56 or newer for its Lua IPC,
-and ImageMagick for the monochrome icon rendering, which it degrades gracefully
-without. The screenshot in this README is of the author's own desktop.
+MIT. See [LICENSE](LICENSE).
