@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "bogdart.dock",
   "name": "Dock",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "author": "bogdart",
   "license": "MIT",
   "description": "Bottom dock with pinned launchers, open-window icons, and minimize-to-dock via the special:minimized workspace.",

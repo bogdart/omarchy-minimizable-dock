@@ -127,7 +127,7 @@ Item {
   // browser and file manager, is what a dock with nothing configured pins.
   //
   // All of it is read straight from the XDG files rather than written into
-  // shell.json by an installer, so a plugin installed from the menu — which
+  // shell.json ahead of time, so a plugin installed from the menu — which
   // deliberately runs no setup script — behaves correctly with no setup at all.
   readonly property string homeDir: String(Quickshell.env("HOME") || "")
 

@@ -29,7 +29,8 @@ to walk through them. Right-click for minimize all, restore all, pin, and close.
 Minimizing is the part Hyprland genuinely cannot do on its own: it has no
 minimized window state at all. A minimized window is parked on a hidden
 workspace (`special:minimized`), and the dock is what remembers where it came
-from and puts it back. `SUPER + M` minimizes without reaching for the mouse.
+from and puts it back — all of it from the mouse, with optional keyboard
+shortcuts you can add yourself.
 
 Nothing extra to install and nothing extra running: the dock lives inside the
 Quickshell process Omarchy already starts, and drives Hyprland through its own
@@ -72,10 +73,11 @@ omarchy plugin remove bogdart.dock
 
 </details>
 
-Requirements: Omarchy with the Quickshell shell (`$OMARCHY_PATH/shell`),
-Hyprland 0.56 or newer (its Lua IPC is what minimize and focus use), and `jq`.
+Requirements: Omarchy with the Quickshell shell (`$OMARCHY_PATH/shell`) and
+Hyprland 0.56 or newer, whose Lua IPC is what minimize and focus use.
 ImageMagick (`magick`, stock on Omarchy) renders the monochrome icons; without
-it the dock falls back to the apps' own colour icons.
+it the dock falls back to the apps' own colour icons. Nothing else is needed and
+nothing is bundled.
 
 ### Optional: keyboard shortcuts
 
@@ -174,16 +176,11 @@ the list or the menu.
 
 ## Keys
 
-Set in `~/.config/hypr/bindings.lua`:
-
-| Key | Action |
-|---|---|
-| `SUPER + M` | minimize the active window to the dock |
-| `SUPER + CTRL + M` | restore the most recently minimized window |
-| `SUPER + D` | hide/show the dock |
-
-`SUPER + M` is a plain Hyprland dispatcher, so minimizing keeps working even if
-the shell is restarted; the dock only supplies the way back.
+The dock ships no keybindings — see
+[Optional: keyboard shortcuts](#optional-keyboard-shortcuts) for the lines to
+add if you want them. Once added, `SUPER + M` is a plain Hyprland dispatcher, so
+minimizing keeps working even while the shell is restarting; the dock only
+supplies the way back.
 
 ## Commands
 
@@ -230,9 +227,9 @@ The dock reads its own entry in `~/.config/omarchy/shell.json` under
 | `monochromeColor` | `frame` | the ink: `frame` is the dock's border colour (the theme accent), `foreground` the theme's text colour |
 | `onlyCurrentWorkspace` | `false` | `true` shows only windows on the focused workspace — minimized windows always show |
 | `appsButton` | `true` | the trailing button that opens Omarchy's apps menu |
-| `pinned` | — | desktop entry ids, in dock order. Right-click → Pin/Unpin edits this list for you |
-| `aliases` | — | window class → desktop entry id, for windows whose class has no entry of its own (Omarchy launches terminals as `org.omarchy.terminal`) |
-| `ignore` | `[]` | extra window classes to keep out of the dock (`org.quickshell` and `org.omarchy.screensaver` are always ignored) |
+| `pinned` | detected | desktop entry ids, in dock order. Left out, the dock pins this system's terminal, browser, and file manager; an explicit list always wins, including an empty one. Right-click → Pin/Unpin edits this list for you |
+| `aliases` | detected | window class → desktop entry id, for windows whose class has no entry of its own. Omarchy's `org.omarchy.terminal`, `org.omarchy.bash`, `TUI.float` and `org.omarchy.btop` are mapped for you; anything set here is layered on top |
+| `ignore` | `[]` | extra window classes to keep out of the dock. Always ignored: `org.quickshell`, `org.omarchy.screensaver`, the input methods (`fcitx`, `fcitx5`, `ibus` and friends), and any surface that reports no app id at all |
 
 Pinned ids are desktop entry ids without `.desktop`; `omarchy plugin list` and
 `ls /usr/share/applications ~/.local/share/applications` are the places to find
@@ -301,8 +298,14 @@ the cache behind — `rm -rf ~/.cache/bogdart.dock` clears it.
   deciding what a click means. A stuck pointer state can therefore never leave stale
   indicators on screen, and a watchdog releases hover if a leave event is ever
   missed.
+- Surfaces that report no app id are skipped entirely. Input-method candidate
+  windows, tooltips, and stray override-redirect X11 surfaces all arrive that
+  way; there is no launcher behind them and nothing to switch to, so they used
+  to appear as a `?` icon named "Unknown" — the resolver's way of saying it had
+  nothing to work with.
 - Files: `Dock.qml` (windows, actions, IPC), `DockItem.qml` (one icon),
-  `DockModel.js` (class matching, grouping, and the structural signature).
+  `DockModel.js` (class matching, grouping, and the structural signature), and
+  `icon-mono.sh` (the ImageMagick icon rendering). No installer, no setup step.
 
 ## License
 
@@ -311,6 +314,5 @@ MIT — see [LICENSE](LICENSE).
 External dependencies: none bundled and nothing vendored. At runtime the dock
 uses only what Omarchy already ships — Quickshell (it runs as a plugin inside
 the existing `omarchy-shell` process), Hyprland 0.56 or newer for its Lua IPC,
-`jq` for the installer, and ImageMagick for the monochrome icon rendering, which
-it degrades gracefully without. The screenshot in this README is of the author's
-own desktop.
+and ImageMagick for the monochrome icon rendering, which it degrades gracefully
+without. The screenshot in this README is of the author's own desktop.
