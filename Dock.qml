@@ -101,7 +101,18 @@ Item {
   // screensaver and lock windows among them) but they are not apps, so they
   // never belong in a dock. Configured ids extend this list.
   readonly property var ignoredClasses: {
-    var ignored = ({ "org.quickshell": true, "org.omarchy.screensaver": true })
+    var ignored = ({
+      "org.quickshell": true,
+      "org.omarchy.screensaver": true,
+      // Input methods map a candidate window while you type. It is a real
+      // toplevel, but it is not an app you can switch to or launch.
+      "fcitx": true,
+      "fcitx5": true,
+      "org.fcitx.fcitx5": true,
+      "ibus": true,
+      "ibus-ui-gtk3": true,
+      "ibus-extension-gtk3": true
+    })
     var extra = setting("ignore", null)
     if (extra && extra.length !== undefined)
       for (var i = 0; i < extra.length; i++) ignored[String(extra[i]).toLowerCase()] = true
@@ -585,6 +596,13 @@ Item {
         : Number((ipc.workspace && ipc.workspace.id) || 0)
       var appId = toplevel.wayland ? String(toplevel.wayland.appId || "") : ""
       if (!appId) appId = String(ipc.class || ipc.initialClass || "")
+      // Nothing identifies itself as nothing. A toplevel with no app id at all
+      // is an input-method candidate window, a tooltip, or a stray
+      // override-redirect X11 surface — there is no launcher behind it, no
+      // icon to draw, and nothing to switch to. It used to land in the dock as
+      // a "?" icon under the name "Unknown", which is the resolver's way of
+      // saying it had nothing to work with.
+      if (!appId) continue
       if (root.ignoredClasses[appId.toLowerCase()]) continue
       var address = String(toplevel.address || "")
 

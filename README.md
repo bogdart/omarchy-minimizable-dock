@@ -81,16 +81,17 @@ it the dock falls back to the apps' own colour icons.
 
 The dock needs nothing else to work. It reads this system's terminal, browser,
 and file manager for its own defaults, and claims its own Hyprland layer rule
-when it starts, so there is no configuration step.
+when it starts, so there is no configuration step and no setup script.
 
-Keyboard shortcuts are the one thing a plugin genuinely cannot set up for
-itself, because they live in your Hyprland config and Omarchy never runs code
-from a plugin. If you want them, clone the repo and run:
+Keyboard shortcuts are the one thing a plugin cannot set up for itself, because
+they live in your Hyprland config and Omarchy never runs code from a plugin. If
+you want them, paste these at the end of `~/.config/hypr/bindings.lua` and run
+`hyprctl reload`:
 
-```bash
-./shortcuts.sh              # add the keybindings
-./shortcuts.sh --dry-run    # show what would change, change nothing
-./shortcuts.sh --uninstall  # remove them again
+```lua
+o.bind("SUPER + M", "Minimize window to dock", hl.dsp.window.move({ workspace = "special:minimized", follow = false }))
+o.bind("SUPER + CTRL + M", "Restore last minimized window", "omarchy-shell dock restore")
+o.bind("SUPER + D", "Toggle dock", "omarchy-shell dock toggle")
 ```
 
 | | |
@@ -99,50 +100,21 @@ from a plugin. If you want them, clone the repo and run:
 | `SUPER + CTRL + M` | restore the last minimized window |
 | `SUPER + D` | hide/show the dock |
 
-#### Exactly what it does
-
-One file, `~/.config/hypr/bindings.lua`. Nothing else on the system is read or
-written, no other file is created, and it never needs root.
-
-1. Refuses to continue unless that path is a regular file — not a symlink — in
-   a directory that is also not a symlink and is owned by you. The path is
-   predictable, so a link left in its place is the obvious way to turn this
-   into a write somewhere else.
-2. Copies the current file to `bindings.lua.bak.<timestamp>.<random>`, created
-   exclusively with `mktemp` so the backup cannot be redirected either.
-3. Writes the original content plus the block below to a `mktemp` file **in the
-   same directory**, then renames it over the original. The rename is atomic:
-   a reader sees either the old file or the new one, never a partial write, and
-   nothing is ever appended to a path resolved at the last moment.
-4. Runs `hyprctl reload`.
-
-`--uninstall` reverses step 3, removing everything between the two markers and
-leaving the rest of the file untouched. `--dry-run` performs steps 1 and 4's
-checks and prints what it would do without writing anything.
-
-Because the block is appended, its bindings take precedence over an earlier
-binding of the same keys. If any of the three is already bound, the script
-warns and names what it is shadowing rather than deciding for you; your
-original line stays in the file and works again once the block is removed.
-
-#### Manual setup instead
-
-The script is a convenience, not a requirement. To do it by hand — or to review
-exactly what it would have written — paste this at the end of
-`~/.config/hypr/bindings.lua` and run `hyprctl reload`:
+Deleting those three lines removes them again. They are ordinary Hyprland
+bindings that reach the dock through its `dock` IPC target rather than through
+the plugin, so they survive reinstalls and keep working even under a different
+plugin id. Two more are available if you want them:
 
 ```lua
--- >>> omarchy dock shortcuts >>>
-o.bind("SUPER + M", "Minimize window to dock", hl.dsp.window.move({ workspace = "special:minimized", follow = false }))
-o.bind("SUPER + CTRL + M", "Restore last minimized window", "omarchy-shell dock restore")
-o.bind("SUPER + D", "Toggle dock", "omarchy-shell dock toggle")
--- <<< omarchy dock shortcuts <<<
+o.bind("SUPER + ALT + M", "Restore all minimized windows", "omarchy-shell dock restoreAll")
+o.bind("SUPER + ALT + D", "Peek at the dock", "omarchy-shell dock peek")
 ```
 
-Deleting those lines is a complete uninstall of the shortcuts. The dock reads
-nothing from them — they are ordinary Hyprland bindings that call the dock's IPC
-by its `dock` target name, so they keep working across reinstalls and even under
-a different plugin id.
+Minimize and restore are fully usable without them — click a focused app's icon
+to minimize it, click again to bring it back — so skipping the shortcuts costs
+you only the keyboard route. Hiding the dock is the one thing with no mouse
+equivalent: with `autohide` on it reveals itself at the screen edge anyway, and
+`omarchy-shell dock toggle` does it from a terminal.
 
 ## Layout
 
