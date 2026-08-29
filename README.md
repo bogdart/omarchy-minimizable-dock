@@ -1,6 +1,6 @@
 # Omarchy Minimizable Dock
 
-![The dock across the bottom of a Hyprland desktop: themed monochrome app icons on a rounded card, the focused app outlined, dots under each icon marking its open windows, and the app launcher button at the far right](docs/screenshot.png)
+![The dock across the bottom of a Hyprland desktop: themed monochrome app icons on a rounded card, the focused app outlined, dots under each icon marking its open windows, and the app launcher button at the far right](preview.png)
 
 A dock for [Omarchy](https://omarchy.org/) — with theme-matching icons,
 pinning, minimizing and maximizing.
