@@ -100,6 +100,7 @@ omarchy plugin remove bogdart.dock
 | right click | menu: window list, new window, restore all, minimize all, pin, close |
 | scroll | step through that app's windows |
 | hover | list of that app's windows by name |
+| drag | move a pinned icon to change its place |
 
 In the hover list, left click switches to a window or restores it, right click
 minimizes it, and middle click closes it. The list stays open after a right or

@@ -30,12 +30,25 @@ Item {
   readonly property bool focused: !isSeparator && !!facts && facts.focused === true
   readonly property bool allMinimized: !isSeparator && !!facts && facts.allMinimized === true
   readonly property int windowCount: (isSeparator || !facts) ? 0 : (facts.windowCount || 0)
+  readonly property bool pinnedItem: !isSeparator && !isAppsButton && !!facts && facts.pinned === true
+  // A shell-owned window with no icon of its own draws as a font glyph
+  // instead of an image, in the theme's foreground like the apps button.
+  readonly property string glyph: (!isSeparator && !isAppsButton && facts && facts.glyph) ? String(facts.glyph) : ""
+  // This cell is the source of an active drag: its icon stays in place but
+  // dims, while the ghost in Dock.qml does the moving.
+  property bool dragSource: false
+  // Glyphs are drawn in the same ink the monochrome icons are rendered in, so
+  // a glyph cell reads as one of the row rather than a stranger in it.
+  property color glyphColor: Color.foreground
 
   signal activateRequested()
   signal launchRequested()
   signal menuRequested()
   signal cycleRequested(int steps)
   signal hoverChanged(bool hovered)
+  signal reorderStarted()
+  signal reorderMoved(real pointX)
+  signal reorderEnded()
 
   implicitWidth: isSeparator ? Style.space(9) : itemSize
   implicitHeight: itemSize + indicatorZone
@@ -97,7 +110,7 @@ Item {
   Image {
     id: icon
 
-    visible: !item.isSeparator && !item.isAppsButton
+    visible: !item.isSeparator && !item.isAppsButton && item.glyph === ""
     anchors.centerIn: cell
     width: item.iconSize
     height: item.iconSize
@@ -110,6 +123,24 @@ Item {
     // A dimmed icon means "running but nothing on screen": every window of
     // this app is parked on the minimized workspace. Running and not running
     // look the same — the dots below tell them apart.
+    opacity: item.dragSource ? 0.3 : (item.running && item.allMinimized ? 0.5 : 1.0)
+    scale: pointer.containsMouse ? 1.08 : 1.0
+
+    Behavior on scale {
+      NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
+    }
+    Behavior on opacity {
+      NumberAnimation { duration: 130 }
+    }
+  }
+
+  Text {
+    visible: !item.isSeparator && !item.isAppsButton && item.glyph !== ""
+    anchors.centerIn: cell
+    text: item.glyph
+    font.family: Style.font.family
+    font.pixelSize: Math.round(item.iconSize * 0.72)
+    color: item.glyphColor
     opacity: item.running && item.allMinimized ? 0.5 : 1.0
     scale: pointer.containsMouse ? 1.08 : 1.0
 
@@ -167,10 +198,57 @@ Item {
     acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
     cursorShape: Qt.PointingHandCursor
 
+    // Reorder drag. A pinned cell's press arms it; moving past the threshold
+    // turns the press into a drag instead of a click. The MouseArea keeps its
+    // grab for the whole drag, so position updates keep coming wherever the
+    // pointer goes, and the click that would fire on release is swallowed.
+    property real pressX: 0
+    property real pressY: 0
+    property bool reordering: false
+    property bool swallowClick: false
+
     onEntered: item.hoverChanged(true)
     onExited: item.hoverChanged(false)
 
+    onPressed: function(mouse) {
+      pointer.swallowClick = false
+      if (mouse.button === Qt.LeftButton) {
+        pointer.pressX = mouse.x
+        pointer.pressY = mouse.y
+      }
+    }
+
+    onPositionChanged: function(mouse) {
+      if (!(pointer.pressedButtons & Qt.LeftButton)) return
+      if (!pointer.reordering) {
+        if (!item.pinnedItem) return
+        if (Math.abs(mouse.x - pointer.pressX) + Math.abs(mouse.y - pointer.pressY) < 14) return
+        pointer.reordering = true
+        pointer.swallowClick = true
+        item.reorderStarted()
+      }
+      item.reorderMoved(mouse.x)
+    }
+
+    onReleased: function(mouse) {
+      if (pointer.reordering) {
+        pointer.reordering = false
+        item.reorderEnded()
+      }
+    }
+
+    onCanceled: {
+      if (pointer.reordering) {
+        pointer.reordering = false
+        item.reorderEnded()
+      }
+    }
+
     onClicked: function(mouse) {
+      if (pointer.swallowClick) {
+        pointer.swallowClick = false
+        return
+      }
       if (mouse.button === Qt.MiddleButton) item.launchRequested()
       else if (mouse.button === Qt.RightButton) item.menuRequested()
       else item.activateRequested()

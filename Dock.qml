@@ -97,6 +97,12 @@ Item {
     if (root.entryIndex["btop"]) out["org.omarchy.btop"] = "btop"
     return out
   }
+  // Shell-owned windows with no desktop entry and no themed icon of their own,
+  // drawn as the same Nerd Font glyph the bar uses for them. A glyph follows
+  // the theme's foreground colour for free, exactly like the apps button.
+  readonly property var classGlyphs: ({
+    "org.omarchy.agent": "󱚣"
+  })
   // Shell-owned surfaces are real toplevels on Hyprland (the Omarchy
   // screensaver and lock windows among them) but they are not apps, so they
   // never belong in a dock. Configured ids extend this list.
@@ -526,7 +532,8 @@ Item {
       key: entry ? DockModel.normalizeKey(entry.id) : DockModel.normalizeKey(target),
       entryId: entry ? String(entry.id) : "",
       name: entry ? String(entry.name || entry.id) : DockModel.prettyName(target),
-      icon: root.iconSourceFor(entry, target)
+      icon: root.iconSourceFor(entry, target),
+      glyph: entry ? "" : (root.classGlyphs[raw] || root.classGlyphs[raw.toLowerCase()] || "")
     }
     root.resolveCache[raw] = meta
     return meta
@@ -556,6 +563,18 @@ Item {
   }
 
   function scheduleRebuild() { rebuildTimer.restart() }
+
+  // rebuild() reads these imperatively, so a change to any of them must
+  // schedule one itself. Pinning used to wait for the next window event to
+  // come along before the row showed it — seconds of nothing happening.
+  // A pin is also an explicit request, so it skips the under-the-pointer
+  // republish deferral: the pointer is on the dock precisely because the user
+  // is changing it and wants to see the change land.
+  onPinnedChanged: { root.publishBypass = true; root.scheduleRebuild() }
+  onAliasesChanged: { root.resolveCache = ({}); root.scheduleRebuild() }
+  onIgnoredClassesChanged: root.scheduleRebuild()
+  onOnlyCurrentWorkspaceChanged: root.scheduleRebuild()
+  onShowAppsButtonChanged: root.scheduleRebuild()
 
   function noteFocus(address) {
     var addr = String(address || "")
@@ -665,6 +684,7 @@ Item {
   property var iconsByKey: ({})
   property var pendingItems: null
   property int deferredTicks: 0
+  property bool publishBypass: false
 
   Timer {
     id: republishTimer
@@ -678,16 +698,24 @@ Item {
   function interactionActive() {
     for (var i = 0; i < root.panels.length; i++) {
       var panel = root.panels[i]
-      if (panel && (panel.pointerInside || panel.listOpen || panel.menuOpen)) return true
+      if (panel && (panel.pointerInside || panel.listOpen || panel.menuOpen || panel.dragging)) return true
     }
+    return false
+  }
+
+  function dragActive() {
+    for (var i = 0; i < root.panels.length; i++)
+      if (root.panels[i] && root.panels[i].dragging) return true
     return false
   }
 
   function flushPendingItems() {
     if (!root.pendingItems) return
     // Wait for the pointer to leave, but only briefly: a hover state that gets
-    // stuck must never be able to freeze the icon row indefinitely.
-    if (root.interactionActive() && root.deferredTicks < 3) {
+    // stuck must never be able to freeze the icon row indefinitely. A drag in
+    // progress is the exception — republishing would destroy the very cell
+    // whose grab is driving it, so the flush waits the drag out.
+    if (root.interactionActive() && (root.deferredTicks < 3 || root.dragActive())) {
       root.deferredTicks++
       republishTimer.restart()
       return
@@ -725,9 +753,10 @@ Item {
     var signature = DockModel.signature(nextItems)
     if (signature === root.itemsSignature) {
       root.pendingItems = null
+      root.publishBypass = false
       return
     }
-    if (root.interactionActive()) {
+    if (root.interactionActive() && !root.publishBypass) {
       root.pendingItems = nextItems
       republishTimer.restart()
       return
@@ -737,6 +766,7 @@ Item {
     root.publishCount++
     root.itemsSignature = signature
     root.items = nextItems
+    root.publishBypass = false
   }
 
   function groupFor(key) {
@@ -1032,6 +1062,21 @@ Item {
       if (!group.entryId) return false
       next.push(group.entryId)
     }
+    return root.persistSetting("pinned", next)
+  }
+
+  // Reorder the pinned list by displayed position. The trimmed copy mirrors
+  // buildGroups, which skips blank ids, so the indices the drag computed from
+  // the row line up with the entries being moved.
+  function movePinned(from, to) {
+    var next = []
+    for (var i = 0; i < root.pinned.length; i++) {
+      var id = String(root.pinned[i] || "").trim()
+      if (id) next.push(id)
+    }
+    if (from < 0 || from >= next.length || to < 0 || to >= next.length || from === to) return false
+    var moved = next.splice(from, 1)[0]
+    next.splice(to, 0, moved)
     return root.persistSetting("pinned", next)
   }
 
@@ -1342,6 +1387,62 @@ Item {
       listDelay.stop()
     }
 
+    // ---------------------------------------------------- pinned reorder
+    // Dragging a pinned icon moves it within the pinned zone. The zone is the
+    // leading run of equal-width cells, so positions are pure arithmetic: no
+    // delegate introspection, and the math holds even while the ghost covers
+    // the cells it is measuring.
+    property bool dragging: false
+    property string dragKey: ""
+    property int dragFrom: -1
+    property int dropIndex: 0
+    property int pinnedCells: 0
+    property real dragRowX: 0
+    readonly property int dragStride: root.itemSize + root.itemSpacing
+
+    function startReorder(group) {
+      var live = root.liveGroup(group)
+      if (!live || live.separator || live.appsButton) return
+      var count = 0
+      var from = -1
+      for (var i = 0; i < root.items.length; i++) {
+        var entry = root.items[i]
+        if (!entry || entry.separator || entry.appsButton || entry.pinned !== true) break
+        if (entry.key === live.key) from = count
+        count++
+      }
+      // One pinned icon has nowhere to go, and a miss means the row changed
+      // under the press; either way there is nothing to drag.
+      if (count < 2 || from === -1) return
+      dockWindow.dragKey = String(live.key)
+      dockWindow.dragFrom = from
+      dockWindow.pinnedCells = count
+      dockWindow.dropIndex = from
+      dockWindow.dragRowX = from * dockWindow.dragStride + root.itemSize / 2
+      dockWindow.dragging = true
+      dockWindow.closeList()
+    }
+
+    function updateReorder(rowX) {
+      if (!dockWindow.dragging) return
+      var max = dockWindow.pinnedCells * dockWindow.dragStride - root.itemSpacing
+      dockWindow.dragRowX = Math.max(0, Math.min(rowX, max))
+      dockWindow.dropIndex = Math.max(0, Math.min(
+        Math.round(dockWindow.dragRowX / dockWindow.dragStride), dockWindow.pinnedCells))
+    }
+
+    function endReorder() {
+      if (!dockWindow.dragging) return
+      var from = dockWindow.dragFrom
+      // Gap indices count one past each cell, so a gap right of the source
+      // lands one lower once the source is pulled out of the list.
+      var to = dockWindow.dropIndex > from ? dockWindow.dropIndex - 1 : dockWindow.dropIndex
+      dockWindow.dragging = false
+      dockWindow.dragKey = ""
+      dockWindow.dragFrom = -1
+      if (to !== from) root.movePinned(from, to)
+    }
+
     function openMenu(sourceItem, group) {
       if (!group || group.separator) return
       dockWindow.closeList()
@@ -1374,7 +1475,7 @@ Item {
     Timer {
       id: listDelay
       interval: 380
-      onTriggered: dockWindow.listOpen = dockWindow.hoveredItem !== null
+      onTriggered: dockWindow.listOpen = dockWindow.hoveredItem !== null && !dockWindow.dragging
     }
 
     // One grace period covers both handing the pointer between surfaces and
@@ -1462,13 +1563,45 @@ Item {
               edgePad: root.pad
               dockPosition: root.position
 
+              dragSource: dockWindow.dragging && dockWindow.dragKey === modelData.key
+              glyphColor: root.monochrome ? root.monoInk : Color.foreground
+
               onActivateRequested: root.activateGroup(modelData)
               onLaunchRequested: root.launchGroup(modelData)
               onMenuRequested: dockWindow.openMenu(dockItem, modelData)
               onCycleRequested: function(steps) { root.cycleGroup(modelData, steps) }
               onHoverChanged: function(hovered) { dockWindow.setHovered(dockItem, modelData, hovered) }
+              onReorderStarted: dockWindow.startReorder(modelData)
+              onReorderMoved: function(pointX) { dockWindow.updateReorder(dockItem.mapToItem(itemRow, pointX, 0).x) }
+              onReorderEnded: dockWindow.endReorder()
             }
           }
+        }
+
+        // While a pinned icon is dragged, a bar marks the gap it will land in
+        // and the icon itself follows the pointer over the dimmed row.
+        Rectangle {
+          visible: dockWindow.dragging
+          x: Math.round(itemRow.x + dockWindow.dropIndex * dockWindow.dragStride - root.itemSpacing / 2 - width / 2)
+          y: itemRow.y + Math.round(root.indicatorZone / 2)
+          width: Math.max(2, Style.space(2))
+          height: root.itemSize
+          radius: width / 2
+          color: Color.accent
+        }
+
+        Image {
+          visible: dockWindow.dragging && source !== ""
+          source: dockWindow.dragging ? root.monoSourceFor(root.iconsByKey[dockWindow.dragKey] || "") : ""
+          width: root.iconSize
+          height: root.iconSize
+          fillMode: Image.PreserveAspectFit
+          sourceSize.width: Math.round(root.iconSize * Screen.devicePixelRatio)
+          sourceSize.height: Math.round(root.iconSize * Screen.devicePixelRatio)
+          x: Math.round(itemRow.x + dockWindow.dragRowX - width / 2)
+          y: itemRow.y + Math.round(root.indicatorZone / 2) + Math.round((root.itemSize - height) / 2)
+          z: 5
+          opacity: 0.85
         }
       }
     }

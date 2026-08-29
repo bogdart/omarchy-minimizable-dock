@@ -95,6 +95,7 @@ function buildGroups(windows, pinned, resolve, options) {
       entryId: (meta && meta.entryId) || "",
       name: (meta && meta.name) || key,
       icon: (meta && meta.icon) || "",
+      glyph: (meta && meta.glyph) || "",
       pinned: isPinned === true,
       separator: false,
       windows: []
