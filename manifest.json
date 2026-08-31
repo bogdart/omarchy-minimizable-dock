@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "bogdart.dock",
   "name": "Minimizable Dock",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "author": "bogdart",
   "license": "MIT",
   "description": "A dock for Omarchy with theme-matching icons, pinning, and minimize/restore for Hyprland windows.",

@@ -45,6 +45,13 @@ Item {
 
   readonly property string position: setting("position", "bottom") === "top" ? "top" : "bottom"
   readonly property bool autohide: setting("autohide", true) !== false
+  // Hyprland draws a fullscreen window above the Top layer, which is where the
+  // dock lives, so the dock vanishes under it. On, the dock moves up to the
+  // Overlay layer for as long as its screen holds a fullscreen window, and
+  // comes back down afterwards. Off by default: it lifts the dock's edge
+  // trigger over the fullscreen window too, and a game or a video player is
+  // exactly where a live strip along the bottom edge is unwanted.
+  readonly property bool showInFullscreen: setting("showInFullscreen", false) === true
   readonly property int iconSize: Math.max(20, Math.min(96, Math.round(Number(setting("iconSize", 40)) || 40)))
   readonly property bool onlyCurrentWorkspace: setting("onlyCurrentWorkspace", false) === true
   readonly property bool showAppsButton: setting("appsButton", true) !== false
@@ -832,6 +839,39 @@ Item {
     return known === undefined ? root.focusedScreenEmpty : known === true
   }
 
+  // Which screens are showing a workspace with a fullscreen window on it. Only
+  // the workspace a monitor currently shows counts: a fullscreen window parked
+  // on some other workspace covers nothing here. Quickshell keeps
+  // `hasFullscreen` current off Hyprland's own fullscreen event, so this map
+  // only has to be recollected when one of those flips.
+  //
+  // Hyprland sets this for a maximized window too, not just a fullscreen one,
+  // and a maximized window covers neither layer. Taking it at its word costs
+  // nothing — the dock sits on Overlay for a while with nothing to be above,
+  // which looks exactly like sitting on Top — and the alternative is asking
+  // Hyprland for every client's fullscreen mode on each flip just to tell two
+  // identical-looking cases apart.
+  property var fullscreenScreens: ({})
+
+  function updateFullscreenScreens() {
+    var next = ({})
+    var monitors = Hyprland.monitors && Hyprland.monitors.values ? Hyprland.monitors.values : []
+    for (var m = 0; m < monitors.length; m++) {
+      var monitor = monitors[m]
+      if (!monitor || !monitor.name) continue
+      var workspace = monitor.activeWorkspace
+      next[String(monitor.name)] = workspace ? workspace.hasFullscreen === true : false
+    }
+    root.fullscreenScreens = next
+  }
+
+  // Unknown screen means no fullscreen: the dock stays on its usual layer
+  // until something says otherwise.
+  function screenHasFullscreen(screenName) {
+    var key = String(screenName || "")
+    return key !== "" && root.fullscreenScreens[key] === true
+  }
+
   function syncMinimizedOrder(windows) {
     var present = ({})
     for (var i = 0; i < windows.length; i++)
@@ -1120,6 +1160,8 @@ Item {
 
   // Same idea for monitors: hold the model so it stays populated, and rebuild
   // when a monitor switches workspace so the bare-desktop reveal follows.
+  // `hasFullscreen` rides along the same binding, so switching workspaces
+  // re-reads it as well as a window going fullscreen where you are.
   Instantiator {
     model: Hyprland.monitors
 
@@ -1128,9 +1170,15 @@ Item {
 
       readonly property int workspaceId: modelData && modelData.activeWorkspace
         ? Number(modelData.activeWorkspace.id) : -1
+      readonly property bool hasFullscreen: modelData && modelData.activeWorkspace
+        ? modelData.activeWorkspace.hasFullscreen === true : false
 
       onWorkspaceIdChanged: root.scheduleRebuild()
-      Component.onCompleted: root.scheduleRebuild()
+      onHasFullscreenChanged: root.updateFullscreenScreens()
+      Component.onCompleted: {
+        root.scheduleRebuild()
+        root.updateFullscreenScreens()
+      }
     }
   }
 
@@ -1241,6 +1289,7 @@ Item {
           screen: panel.screen ? panel.screen.name : "?",
           revealed: panel.revealed,
           desktopEmpty: panel.desktopEmpty,
+          overFullscreen: panel.overFullscreen,
           pointerInside: panel.pointerInside,
           surfaceHovered: panel.surfaceHovered,
           popupHovered: panel.popupHovered,
@@ -1305,6 +1354,12 @@ Item {
       ? dockWindow.height - root.edgeGap - root.cardHeight
       : root.edgeGap
     readonly property bool desktopEmpty: root.screenIsEmpty(dockWindow.screen ? dockWindow.screen.name : "")
+    // Nothing draws over the Overlay layer, fullscreen windows included, so
+    // the dock rides it for exactly as long as this screen has one. Staying on
+    // Overlay the rest of the time would put the dock over every other overlay
+    // surface the shell puts up, which is not the dock's place.
+    readonly property bool overFullscreen: root.showInFullscreen
+      && root.screenHasFullscreen(dockWindow.screen ? dockWindow.screen.name : "")
     readonly property bool revealed: !root.autohide || pointerInside || listOpen || menuOpen
       || root.peeking || desktopEmpty
     // Kept for the debug IPC's older field name.
@@ -1323,7 +1378,9 @@ Item {
     color: "transparent"
     surfaceFormat.opaque: false
     WlrLayershell.namespace: "omarchy-dock"
-    WlrLayershell.layer: WlrLayer.Top
+    // Changed live: the layer surface is re-committed with the new layer, not
+    // torn down and remapped, so the dock does not flicker on the way up.
+    WlrLayershell.layer: dockWindow.overFullscreen ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     exclusionMode: root.autohide ? ExclusionMode.Ignore : ExclusionMode.Normal
     exclusiveZone: root.autohide ? 0 : root.cardHeight + root.edgeGap

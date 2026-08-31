@@ -45,6 +45,13 @@ to bring it back. It also stays up on an empty workspace, and peeks for a moment
 after you minimize a window. Set `"autohide": false` to keep it on screen. In
 that mode it reserves its height and windows tile above it.
 
+A fullscreen window covers the dock, as it covers Omarchy's bar. Set
+`"showInFullscreen": true` and the dock rises above fullscreen instead: move the
+pointer to the edge and it comes up over the window, then drops back to its
+usual place when the window leaves fullscreen. It is off by default because the
+strip along the screen edge that summons the dock rises with it, and in a game
+or a video player that is exactly where you do not want one.
+
 ## Minimizing windows
 
 Minimizing moves the window to a hidden workspace called `special:minimized`.
@@ -147,6 +154,7 @@ The dock reads its own entry in `~/.config/omarchy/shell.json` under
 |---|---|---|
 | `position` | `bottom` | `bottom` or `top` |
 | `autohide` | `true` | hide the dock until the pointer reaches the screen edge |
+| `showInFullscreen` | `false` | let the dock come up over a fullscreen window |
 | `iconSize` | `40` | icon size in logical pixels, 20 to 96 |
 | `opacity` | `0.92` | background opacity |
 | `monochrome` | `true` | redraw icons in one theme colour. `false` uses the apps' own icons |
