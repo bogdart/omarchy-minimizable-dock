@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
+import qs.services
 import "DockModel.js" as DockModel
 
 // A dock for Hyprland, hosted inside omarchy-shell as a keep-loaded panel
@@ -26,8 +27,26 @@ Item {
   // ------------------------------------------------------------- settings
   // The plugin's own entry in shell.json `plugins[]`. It hot-reloads with the
   // rest of the file, so edits take effect without restarting the shell.
+  // Omarchy 4.0.4+ hands third-party plugins a facade without shellConfig, so
+  // read shell.json directly when the host doesn't expose it.
+  property var fileShellConfig: null
+  FileView {
+    id: shellConfigFile
+    path: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: {
+      try { root.fileShellConfig = JSON.parse(text()) } catch (e) { }
+    }
+  }
+
+  // Same story for the app library: the facade only carries it for menus.
+  readonly property var appLibrary: shell && shell.appLibrary ? shell.appLibrary : localAppLibrary
+  AppLibrary { id: localAppLibrary }
+
   readonly property var settings: {
-    var config = shell && shell.shellConfig ? shell.shellConfig : null
+    var config = shell && shell.shellConfig ? shell.shellConfig : root.fileShellConfig
     var list = config && config.plugins ? config.plugins : null
     if (list && list.length !== undefined) {
       for (var i = 0; i < list.length; i++) {
@@ -364,8 +383,8 @@ Item {
       var candidates = DockModel.candidateIds(fallbackId)
       name = candidates.length > 0 ? candidates[candidates.length - 1] : ""
     }
-    if (shell && shell.appLibrary && typeof shell.appLibrary.iconSource === "function")
-      return shell.appLibrary.iconSource(name)
+    if (root.appLibrary && typeof root.appLibrary.iconSource === "function")
+      return root.appLibrary.iconSource(name)
     var themed = name ? Quickshell.iconPath(name, true) : ""
     return themed.length > 0 ? themed : Quickshell.iconPath("application-x-executable", true)
   }
@@ -974,8 +993,8 @@ Item {
 
   function launchGroup(group) {
     if (!group) return false
-    if (group.entryId && shell && shell.appLibrary && typeof shell.appLibrary.launch === "function") {
-      shell.appLibrary.launch(group.entryId, group.name)
+    if (group.entryId && root.appLibrary && typeof root.appLibrary.launch === "function") {
+      root.appLibrary.launch(group.entryId, group.name)
       return true
     }
     if (group.entryId) {
@@ -987,11 +1006,9 @@ Item {
 
   // Omarchy already has an app launcher; the dock's apps button opens that one
   // rather than growing a second one of its own.
+  // The command routes to whichever menu is enabled (a clone included); a
+  // plugin facade may not toggle another plugin's panel.
   function openAppsMenu() {
-    if (shell && typeof shell.toggle === "function") {
-      shell.toggle("omarchy.menu", JSON.stringify({ menu: "apps" }))
-      return true
-    }
     Quickshell.execDetached(["omarchy-menu", "toggle", "apps"])
     return true
   }
@@ -1198,7 +1215,7 @@ Item {
   }
 
   Connections {
-    target: shell && shell.appLibrary ? shell.appLibrary : null
+    target: root.appLibrary
     ignoreUnknownSignals: true
     function onAppsChanged() { root.rebuildIndexes() }
   }
