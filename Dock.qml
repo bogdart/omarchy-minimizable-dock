@@ -1744,6 +1744,7 @@ Item {
           spacing: Style.space(2)
 
           Text {
+            textFormat: Text.PlainText
             text: windowList.group ? windowList.group.name : ""
             color: Color.tooltip.text
             font.family: Style.font.family
@@ -1767,6 +1768,7 @@ Item {
               color: listRowMouse.containsMouse ? Util.alpha(Color.tooltip.text, 0.14) : "transparent"
 
               Text {
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -1822,6 +1824,7 @@ Item {
           }
 
           Text {
+            textFormat: Text.PlainText
             visible: windowList.group && !windowList.group.running && !windowList.group.appsButton
             text: "Not running"
             color: Util.alpha(Color.tooltip.text, 0.6)
@@ -1940,6 +1943,7 @@ Item {
               color: windowRowMouse.containsMouse ? Color.menu.selectedBackground : "transparent"
 
               Text {
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -2002,6 +2006,7 @@ Item {
               color: actionMouse.containsMouse ? Color.menu.selectedBackground : "transparent"
 
               Text {
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.left: parent.left
                 anchors.leftMargin: Style.space(8)

@@ -90,6 +90,7 @@ Item {
   // The apps button is the shell's own glyph rather than an app icon: it is a
   // door into Omarchy's menu, not an application.
   Text {
+    textFormat: Text.PlainText
     visible: item.isAppsButton
     anchors.centerIn: cell
     text: "󰀻"
@@ -135,6 +136,7 @@ Item {
   }
 
   Text {
+    textFormat: Text.PlainText
     visible: !item.isSeparator && !item.isAppsButton && item.glyph !== ""
     anchors.centerIn: cell
     text: item.glyph
