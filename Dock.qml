@@ -826,6 +826,11 @@ Item {
   // monitor can be empty while another is full.
   property var emptyScreens: ({})
   property bool focusedScreenEmpty: false
+  // monitor name -> the special workspace open over it (a scratchpad). The
+  // monitor object only reports its regular workspace, so a scratchpad full of
+  // windows over an empty workspace would otherwise read as a bare desktop.
+  // Kept from Hyprland's `activespecial` event, seeded from the monitor IPC.
+  property var specialScreens: ({})
 
   function updateEmptyScreens(windows, focusedWorkspace) {
     var occupied = ({})
@@ -841,6 +846,11 @@ Item {
       var monitor = monitors[m]
       if (!monitor || !monitor.name) continue
       var workspace = monitor.activeWorkspace
+      var special = root.specialScreens[String(monitor.name)]
+      if (special && !DockModel.isMinimizedWorkspace(special)) {
+        next[String(monitor.name)] = false
+        continue
+      }
       // No workspace on the monitor object means Hyprland has not reported one
       // yet; the focused workspace is the safer answer than "empty".
       next[String(monitor.name)] = workspace
@@ -850,6 +860,18 @@ Item {
 
     root.emptyScreens = next
     root.focusedScreenEmpty = fallbackEmpty
+  }
+
+  function setSpecialScreen(monitorName, workspaceName) {
+    var key = String(monitorName || "")
+    if (!key) return
+    var name = String(workspaceName || "")
+    if ((root.specialScreens[key] || "") === name) return
+    var next = Object.assign({}, root.specialScreens)
+    if (name) next[key] = name
+    else delete next[key]
+    root.specialScreens = next
+    root.scheduleRebuild()
   }
 
   function screenIsEmpty(screenName) {
@@ -1190,9 +1212,17 @@ Item {
       readonly property bool hasFullscreen: modelData && modelData.activeWorkspace
         ? modelData.activeWorkspace.hasFullscreen === true : false
 
+      // Read once to pick up a scratchpad already open when the shell starts;
+      // `activespecial` keeps it current after that.
+      readonly property string specialName: modelData && modelData.lastIpcObject
+        && modelData.lastIpcObject.specialWorkspace
+        ? String(modelData.lastIpcObject.specialWorkspace.name || "") : ""
+
       onWorkspaceIdChanged: root.scheduleRebuild()
       onHasFullscreenChanged: root.updateFullscreenScreens()
+      onSpecialNameChanged: root.setSpecialScreen(modelData.name, specialName)
       Component.onCompleted: {
+        if (specialName) root.setSpecialScreen(modelData.name, specialName)
         root.scheduleRebuild()
         root.updateFullscreenScreens()
       }
@@ -1207,6 +1237,14 @@ Item {
       root.scheduleRebuild()
     }
     function onFocusedWorkspaceChanged() { root.scheduleRebuild() }
+    // activespecial>>WORKSPACENAME,MONNAME; the name is empty when it closes.
+    function onRawEvent(event) {
+      if (event.name !== "activespecial") return
+      var data = String(event.data || "")
+      var comma = data.lastIndexOf(",")
+      if (comma < 0) return
+      root.setSpecialScreen(data.slice(comma + 1), data.slice(0, comma))
+    }
   }
 
   Connections {
@@ -1223,6 +1261,7 @@ Item {
   Component.onCompleted: {
     root.rebuildIndexes()
     Hyprland.refreshToplevels()
+    Hyprland.refreshMonitors()
     root.claimLayerRule()
   }
 
@@ -1318,7 +1357,8 @@ Item {
           publishes: root.publishCount,
           exits: panel.exitCount,
           menuOpen: panel.menuOpen,
-          peeking: root.peeking
+          peeking: root.peeking,
+          specialScreens: root.specialScreens
         }))
       }
       return out.length > 0 ? out.join("\n") : "no dock windows"

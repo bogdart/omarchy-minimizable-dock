@@ -42,7 +42,8 @@ is outlined.
 
 By default the dock hides itself. Move the pointer to the bottom of the screen
 to bring it back. It also stays up on an empty workspace, and peeks for a moment
-after you minimize a window. Set `"autohide": false` to keep it on screen. In
+after you minimize a window. A scratchpad or other special workspace open over
+an empty workspace counts as occupied, so the dock still hides there. Set `"autohide": false` to keep it on screen. In
 that mode it reserves its height and windows tile above it.
 
 A fullscreen window covers the dock, as it covers Omarchy's bar. Set
