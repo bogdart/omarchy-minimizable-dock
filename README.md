@@ -43,8 +43,11 @@ is outlined.
 By default the dock hides itself. Move the pointer to the bottom of the screen
 to bring it back. It also stays up on an empty workspace, and peeks for a moment
 after you minimize a window. A scratchpad or other special workspace open over
-an empty workspace counts as occupied, so the dock still hides there. Set `"autohide": false` to keep it on screen. In
-that mode it reserves its height and windows tile above it.
+an empty workspace counts as occupied, so the dock still hides there. Set
+`"showOnEmptyDesktop": false` and an empty workspace hides the dock like any
+other, which suits a second monitor that is kept empty on purpose. Set
+`"autohide": false` to keep the dock on screen everywhere. In that mode it
+reserves its height and windows tile above it.
 
 A fullscreen window covers the dock, as it covers Omarchy's bar. Set
 `"showInFullscreen": true` and the dock rises above fullscreen instead: move the
@@ -155,6 +158,7 @@ The dock reads its own entry in `~/.config/omarchy/shell.json` under
 |---|---|---|
 | `position` | `bottom` | `bottom` or `top` |
 | `autohide` | `true` | hide the dock until the pointer reaches the screen edge |
+| `showOnEmptyDesktop` | `true` | with autohide, keep the dock up on a workspace with no windows. `false` hides it there too |
 | `showInFullscreen` | `false` | let the dock come up over a fullscreen window |
 | `iconSize` | `40` | icon size in logical pixels, 20 to 96 |
 | `opacity` | `0.92` | background opacity |

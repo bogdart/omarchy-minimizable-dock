@@ -64,6 +64,10 @@ Item {
 
   readonly property string position: setting("position", "bottom") === "top" ? "top" : "bottom"
   readonly property bool autohide: setting("autohide", true) !== false
+  // In autohide mode the dock stays up on a screen with no windows, since that
+  // is when the launchers are wanted. Off, an empty screen hides the dock like
+  // any other; useful for a secondary monitor that is kept empty on purpose.
+  readonly property bool showOnEmptyDesktop: setting("showOnEmptyDesktop", true) !== false
   // Hyprland draws a fullscreen window above the Top layer, which is where the
   // dock lives, so the dock vanishes under it. On, the dock moves up to the
   // Overlay layer for as long as its screen holds a fullscreen window, and
@@ -1313,6 +1317,7 @@ Item {
       return JSON.stringify({
         hidden: root.hidden,
         autohide: root.autohide,
+        showOnEmptyDesktop: root.showOnEmptyDesktop,
         position: root.position,
         items: root.items.length,
         minimized: root.minimizedOrder.length,
@@ -1418,7 +1423,7 @@ Item {
     readonly property bool overFullscreen: root.showInFullscreen
       && root.screenHasFullscreen(dockWindow.screen ? dockWindow.screen.name : "")
     readonly property bool revealed: !root.autohide || pointerInside || listOpen || menuOpen
-      || root.peeking || desktopEmpty
+      || root.peeking || (root.showOnEmptyDesktop && desktopEmpty)
     // Kept for the debug IPC's older field name.
     readonly property bool tooltipVisible: listOpen
 
